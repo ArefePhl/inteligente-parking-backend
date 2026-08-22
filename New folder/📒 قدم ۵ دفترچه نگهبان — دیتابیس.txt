@@ -1,0 +1,52 @@
+📒 قدم ۵: دفترچه نگهبان — دیتابیس
+حالا باید سه تا چیز رو ذخیره کنیم. برای این کار از SQLite استفاده می‌کنیم که همراه خود پایتونه و نصب نمی‌خواد — مثل یه دفترچه اکسل که خود برنامه مدیریتش می‌کنه:
+
+python
+import sqlite3
+from datetime import datetime
+
+db = sqlite3.connect("parking.db")
+db.execute("""
+    CREATE TABLE IF NOT EXISTS allowed_plates (
+        plate TEXT PRIMARY KEY,
+        owner_name TEXT
+    )
+""")
+db.execute("""
+    CREATE TABLE IF NOT EXISTS logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        plate TEXT,
+        entry_time TEXT,
+        exit_time TEXT
+    )
+""")
+db.commit()
+منطق ورود و خروج (فکر نگهبان 🧠):
+python
+def car_seen(plate):
+    # ۱. آیا این پلاک مجازه؟
+    allowed = db.execute(
+        "SELECT owner_name FROM allowed_plates WHERE plate = ?", (plate,)
+    ).fetchone()
+
+    if allowed is None:
+        print(f"⛔ پلاک {plate} مجاز نیست!")
+        return
+
+    # ۲. آیا این ماشین الان داخله؟ (رکورد بدون زمان خروج داره؟)
+    open_log = db.execute(
+        "SELECT id FROM logs WHERE plate = ? AND exit_time IS NULL", (plate,)
+    ).fetchone()
+
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    if open_log is None:
+        # داخل نبوده → پس داره وارد میشه
+        db.execute("INSERT INTO logs (plate, entry_time) VALUES (?, ?)", (plate, now))
+        print(f"✅ ورود {plate} ثبت شد")
+    else:
+        # داخل بوده → پس داره خارج میشه
+        db.execute("UPDATE logs SET exit_time = ? WHERE id = ?", (now, open_log[0]))
+        print(f"👋 خروج {plate} ثبت شد")
+
+    db.commit()
