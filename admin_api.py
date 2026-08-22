@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, Header, HTTPException
+from fastapi import FastAPI, Depends, Header, HTTPException, Query
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import contextmanager
@@ -96,10 +96,23 @@ app.add_middleware(
 # ─────────────── وابستگی (dependency) بررسی کلید API ───────────────
 def require_api_key(x_api_key: str = Header(default=None)):
     """
-    این تابع رو جلوی هر endpoint حساس می‌ذاریم (گیت، حذف پلاک).
+    این تابع رو جلوی هر endpoint حساس می‌ذاریم (گیت، حذف پلاک، آپلود عکس).
     درخواست‌کننده باید هدر X-API-Key رو با مقدار درست بفرسته، وگرنه رد می‌شه.
     """
     if not x_api_key or x_api_key != ADMIN_API_KEY:
+        raise HTTPException(status_code=401, detail="کلید API نامعتبر یا وجود نداره")
+    return True
+
+
+def require_api_key_flexible(x_api_key: str = Header(default=None), api_key: str = Query(default=None)):
+    """
+    نسخه‌ی جایگزین require_api_key: علاوه بر هدر، از query parameter هم قبول می‌کنه.
+    فقط برای جاهایی استفاده می‌شه که نمی‌شه هدر فرستاد (مثل تگ <img> برای استریم ویدیو).
+    برای بقیه‌ی endpoint ها همون require_api_key معمولی (فقط هدر) استفاده می‌شه،
+    چون فرستادن کلید توی URL کمی کمتر امنه (ممکنه توی تاریخچه‌ی مرورگر یا لاگ بمونه).
+    """
+    key = x_api_key or api_key
+    if not key or key != ADMIN_API_KEY:
         raise HTTPException(status_code=401, detail="کلید API نامعتبر یا وجود نداره")
     return True
 
@@ -238,7 +251,7 @@ def reject_detection(detection_id: int):
 
 # ─────────────── درگاه شماره ۷: اضافه کردن پلاک از روی عکس ───────────────
 @app.post("/allowed-plates/from-image")
-async def add_from_image(file: UploadFile = File(...), owner: str = Form("")):
+async def add_from_image(file: UploadFile = File(...), owner: str = Form(""), authorized: bool = Depends(require_api_key)):
     # عکس آپلود شده رو بخون
     contents = await file.read()
     img = cv2.imdecode(np.frombuffer(contents, np.uint8), cv2.IMREAD_COLOR)
@@ -396,6 +409,9 @@ upgrade_db()
 CONF_PLATE = 0.5
 CONF_CHAR = 0.4
 CONFIDENCE_THRESHOLD = 0.6
+# اگه حتی یه کاراکتر از پلاک زیر این مقدار باشه، کل پلاک نیاز به بررسی می‌شه
+# حتی اگه میانگین کل بالا باشه (یه کاراکتر ضعیف می‌تونه توی میانگین قایم بشه)
+MIN_SINGLE_CHAR_CONFIDENCE = 0.5
 DEDUP_SECONDS = 10
 EN_TO_FA_DIGITS = str.maketrans('0123456789', '۰۱۲۳۴۵۶۷۸۹')
 
@@ -491,7 +507,10 @@ def camera_loop():
                 continue
 
             avg_conf = sum(c[2] for c in chars_with_conf) / len(chars_with_conf)
-            needs_review = avg_conf < CONFIDENCE_THRESHOLD
+            min_conf = min(c[2] for c in chars_with_conf)
+            # اگه میانگین پایین باشه، یا حتی یه کاراکتر ضعیف داشته باشیم،
+            # کل پلاک نیاز به بررسی داره — یه کاراکتر بد نباید پشت میانگین بالا قایم بشه
+            needs_review = (avg_conf < CONFIDENCE_THRESHOLD) or (min_conf < MIN_SINGLE_CHAR_CONFIDENCE)
             # فقط مقدار یکدست‌شده با دیتابیس مقایسه می‌شه
             allowed = check_is_allowed(plate_text)
 
@@ -539,7 +558,7 @@ def frame_generator():
         time.sleep(0.03)
 
 @app.get("/video_feed")
-def video_feed():
+def video_feed(authorized: bool = Depends(require_api_key_flexible)):
     return StreamingResponse(
         frame_generator(),
         media_type="multipart/x-mixed-replace; boundary=frame"

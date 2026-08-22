@@ -15,3 +15,11 @@ runs/
 *.zip
 New folder/
 __pycache__/
+
+.env
+__pycache__/
+*.pyc
+runs/
+backups/
+plates.db
+.vscode/
