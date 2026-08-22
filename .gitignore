@@ -22,4 +22,4 @@ __pycache__/
 runs/
 backups/
 plates.db
-.vscode/
+.vscode/.vscode/
