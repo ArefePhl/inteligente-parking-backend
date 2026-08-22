@@ -8,3 +8,10 @@
 # پوشه‌های پایتون
 __pycache__/
 *.pyc
+plates.db
+backups/
+runs/
+*.pt
+*.zip
+New folder/
+__pycache__/
