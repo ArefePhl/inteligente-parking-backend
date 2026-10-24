@@ -1,0 +1,12 @@
+fastapi>=0.110
+uvicorn[standard]>=0.29
+python-multipart>=0.0.9
+ultralytics>=8.2
+opencv-python>=4.9
+numpy
+pillow
+arabic-reshaper
+python-bidi
+# tests
+pytest
+httpx

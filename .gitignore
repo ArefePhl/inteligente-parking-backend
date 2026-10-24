@@ -1,25 +1,6 @@
-# هیچ‌وقت این فایل نباید وارد گیت بشه (رمز و مسیرهای شخصی توشه)
 .env
-
-# دیتابیس محلی
-*.db
-*.db-journal
-
-# پوشه‌های پایتون
+plates.db
 __pycache__/
 *.pyc
-plates.db
-backups/
-runs/
-*.pt
-*.zip
-New folder/
-__pycache__/
-
-.env
-__pycache__/
-*.pyc
-runs/
-backups/
-plates.db
-.vscode/.vscode/
+.pytest_cache/
+.pytest_cache/
